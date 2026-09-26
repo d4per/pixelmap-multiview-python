@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # PyPI does not allow a version to be replaced, so a tag that disagrees with the
+  # manifest would publish under the wrong number with no way to take it back.
+  check-version:
+    name: tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          manifest=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$manifest" != "$tag" ]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $manifest" >&2
+            exit 1
+          fi
+          echo "publishing version $manifest"
+
+  wheels:
+    needs: check-version
+    name: wheels (${{ matrix.platform.runner }} ${{ matrix.platform.target }}${{ matrix.platform.manylinux == 'musllinux_1_2' && ' musl' || '' }})
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+            manylinux: auto
+          - runner: ubuntu-22.04
+            target: aarch64
+            manylinux: auto
+          - runner: ubuntu-22.04
+            target: x86_64
+            manylinux: musllinux_1_2
+          # The labels `maturin generate-ci` emits. macos-13 was retired and a job asking
+          # for a label that no longer exists queues forever rather than failing, so this
+          # is worth re-checking against the runner-images README when a release stalls.
+          - runner: macos-latest
+            target: aarch64
+          - runner: macos-15-intel
+            target: x86_64
+          - runner: windows-latest
+            target: x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          # One abi3 wheel per platform covers CPython 3.9 and up.
+          args: --release --out dist
+          manylinux: ${{ matrix.platform.manylinux }}
+          sccache: "true"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}-${{ matrix.platform.manylinux || 'native' }}
+          path: dist
+
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist
+
+  # Smoke-test the artefacts before they go anywhere permanent: PyPI does not allow a
+  # version to be replaced, so a broken wheel there is a bumped version, not a fix.
+  verify:
+    name: install and import each wheel
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - run: ls -la dist
+      - run: pip install numpy && pip install dist/*manylinux*x86_64.whl
+      - run: python -c "import pixelmap_multiview as m; p=m._pixelmap_multiview._synthetic_orbit('corner',4,36.0,640,480); print(m.reconstruct(p))"
+
+  publish:
+    name: publish to PyPI
+    needs: verify
+    # Only a tag publishes. This is what makes `workflow_dispatch` a dry run: it builds
+    # every wheel and the sdist, verifies one installs, and stops. Without it, anyone
+    # clicking "Run workflow" would upload to PyPI, where a version cannot be replaced.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pixelmap-multiview-python
+    permissions:
+      # Trusted Publishing: PyPI verifies this workflow's OIDC identity, so there is no
+      # API token to store or rotate. Register the publisher on PyPI before the first tag.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

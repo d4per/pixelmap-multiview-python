@@ -1,0 +1,55 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pixelmap-multiview-python"
+requires-python = ">=3.9"
+description = "3D reconstruction from three or more photos: camera registration, dense depth, fusion and texturing"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Per Brendelökken", email = "per@brendelokken.se" }]
+keywords = ["computer-vision", "photogrammetry", "3d-reconstruction", "structure-from-motion", "sfm", "mesh"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=1.21"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+images = ["pillow>=9.1"]
+dev = ["pytest", "pillow>=9.1", "ruff"]
+
+[project.urls]
+Homepage = "https://pixelmap.dogduck.com"
+Repository = "https://github.com/d4per/pixelmap-multiview-python"
+"Rust crate" = "https://crates.io/crates/pixelmap_multiview"
+
+[tool.maturin]
+python-source = "python"
+module-name = "pixelmap_multiview._pixelmap_multiview"
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py39"
+extend-exclude = ["target"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.lint.pyupgrade]
+# The package supports CPython 3.9, so `typing.Optional` and `typing.Tuple` stay even
+# though `from __future__ import annotations` would make the modern spellings safe in
+# annotations: the aliases below are evaluated at runtime, where they would not be.
+keep-runtime-typing = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
