@@ -9,7 +9,7 @@ description = "3D reconstruction from three or more photos: camera registration,
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Per Brendelökken", email = "per@brendelokken.se" }]
-keywords = ["computer-vision", "photogrammetry", "3d-reconstruction", "structure-from-motion", "sfm", "mesh"]
+keywords = ["computer-vision", "photogrammetry", "3d-reconstruction", "structure-from-motion", "sfm", "mesh", "gltf"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",

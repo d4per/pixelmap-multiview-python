@@ -4,6 +4,18 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.1 - 2026-10-04
+
+### Added
+
+- `Model.save` writes two more formats: `.glb`, binary glTF 2.0 with the texture atlas
+  embedded, and `.html`, one self-contained page that shows the textured model in 3D in
+  a browser. A new `title` keyword names the page.
+
+### Changed
+
+- Built against `pixelmap_multiview` 0.1.1, which provides the GLB and HTML writers.
+
 ## 0.1.0 - 2026-09-26
 
 First release, built against `pixelmap_multiview` 0.1.0.

@@ -221,18 +221,31 @@ class Model:
 
     # -- writing out ----------------------------------------------------------
 
-    def save(self, path: Union[str, os.PathLike]) -> list[Path]:
-        """Writes the model for MeshLab, Blender, CloudCompare and the like.
+    def save(
+        self, path: Union[str, os.PathLike], *, title: Optional[str] = None
+    ) -> list[Path]:
+        """Writes the model for MeshLab, Blender, CloudCompare, web browsers and so on.
 
         The format follows the suffix:
 
         - ``.obj``: textured Wavefront OBJ, with a ``.mtl`` material library and the atlas
           as ``<stem>_texture.png`` next to it.
         - ``.x3d``: textured X3D, with the atlas as ``<stem>_texture.png`` next to it.
+        - ``.glb``: binary glTF 2.0, one file with the atlas embedded, for Blender, the
+          Windows 3D Viewer, three.js and most game engines.
+        - ``.html``: one self-contained web page that shows the textured model in 3D, to
+          be turned with the mouse or a finger. The model is embedded in the page, but
+          the viewer, Google's ``<model-viewer>``, is fetched from cdn.jsdelivr.net, so
+          opening it needs a network connection.
         - ``.ply``: ASCII PLY with a colour per vertex, for viewers that do not load
           textures.
 
         The model is turned half a revolution about x so that viewers show it upright.
+
+        Args:
+            path: Where to write the model; its suffix picks the format.
+            title: The page title for ``.html``, the file's stem by default. The other
+                formats ignore it.
 
         Returns:
             Every file written, the one named first.
@@ -253,12 +266,16 @@ class Model:
                 path: self._inner.x3d(texture.name),
                 texture: self._inner.atlas_png(),
             }
+        elif suffix == ".glb":
+            files = {path: self._inner.glb()}
+        elif suffix == ".html":
+            files = {path: self._inner.html(path.stem if title is None else title)}
         elif suffix == ".ply":
             files = {path: self._inner.ply()}
         else:
             raise ValueError(
-                f"cannot tell the format from {path.name!r}; use a .obj, .x3d or .ply "
-                f"suffix"
+                f"cannot tell the format from {path.name!r}; use a .obj, .x3d, .glb, "
+                f".html or .ply suffix"
             )
 
         for target, data in files.items():

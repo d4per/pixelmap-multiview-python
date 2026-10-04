@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "pixelmap-multiview-py"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "numpy",
  "pixelmap_multiview",
@@ -282,9 +282,9 @@ dependencies = [
 
 [[package]]
 name = "pixelmap_multiview"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1c63a4cc624ec8f88f17b94d3d5d6feff911b659b7d9e4a0ab30a0824f58c12"
+checksum = "7e34495b7bc4024b66ad01458350950effc7dec766a2aaea572179d2f9f71c5b"
 dependencies = [
  "nalgebra",
  "pixelmap",

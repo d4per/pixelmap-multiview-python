@@ -42,6 +42,7 @@ model = pmv.reconstruct(photos, quality="medium", focal_35mm=focal)
 
 print(model)  # <pixelmap_multiview.Model 23314 vertices, 45708 triangles, 4 of 4 photos>
 model.save("out/statue.obj")  # + statue.mtl + statue_texture.png, for MeshLab or Blender
+model.save("out/statue.html")  # open it in a browser and turn the model around
 ```
 
 `load_photos` turns each photo upright according to its EXIF orientation and scales it
@@ -64,9 +65,25 @@ of uint8 arrays `(H, W, 3)`, `(H, W, 4)` or `(H, W)`, or Pillow images, all the 
 
 All of these are in one frame. The first camera of the best pair sits at the origin
 looking along +z with +y down the image, and the distance between that pair's cameras is
-the unit of length. **Nothing is metric.** `model.save()` writes `.obj` (textured),
-`.x3d` (textured) or `.ply` (vertex colours), turned half a revolution about x so that
-viewers show the model upright.
+the unit of length. **Nothing is metric.**
+
+## Saving
+
+`model.save(path)` picks the format from the suffix:
+
+| Suffix | Writes | Opens in |
+|---|---|---|
+| `.obj` | textured Wavefront OBJ, plus `<stem>.mtl` and `<stem>_texture.png` | MeshLab, Blender, CloudCompare |
+| `.x3d` | textured X3D, plus `<stem>_texture.png` | MeshLab, X3D viewers |
+| `.glb` | binary glTF 2.0, one file with the texture embedded | Blender, Windows 3D Viewer, three.js, most game engines |
+| `.html` | one web page with the textured model embedded, shown in 3D | any browser |
+| `.ply` | ASCII PLY with a colour per vertex | viewers that do not load textures |
+
+It returns every file it wrote. The `.html` page is titled after the file's stem unless you
+pass `title="..."`. The model is embedded in the page, but the viewer, Google's
+`<model-viewer>`, is fetched from cdn.jsdelivr.net, so opening the page needs a network
+connection. Every format is turned half a revolution about x so that viewers show the
+model upright; the arrays on `model` are not turned.
 
 ## Following along and stopping
 

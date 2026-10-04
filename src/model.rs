@@ -1,8 +1,11 @@
 //! A finished reconstruction, handed to Python as arrays.
 
+use std::io::{self, Write};
+
 use numpy::ndarray::Array1;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3};
 use pixelmap_multiview::export;
+use pixelmap_multiview::pixelmap::Photo;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
@@ -39,6 +42,25 @@ fn written(
         })
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
     Ok(PyBytes::new(py, &buffer))
+}
+
+/// Encodes the texture atlas as PNG: the crate does no image encoding, and the GLB and
+/// HTML writers take the atlas ready-encoded.
+fn write_png(out: &mut impl Write, atlas: &Photo) -> io::Result<()> {
+    let mut encoder = png::Encoder::new(out, atlas.width() as u32, atlas.height() as u32);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(atlas.as_rgba())?;
+    writer.finish()?;
+    Ok(())
+}
+
+/// The texture atlas as PNG, in memory.
+fn png_bytes(atlas: &Photo) -> io::Result<Vec<u8>> {
+    let mut png = Vec::new();
+    write_png(&mut png, atlas)?;
+    Ok(png)
 }
 
 #[pymethods]
@@ -174,17 +196,27 @@ impl Model {
         })
     }
 
+    /// Binary glTF 2.0, with the atlas embedded.
+    fn glb<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let (mesh, texture) = (&self.inner.mesh, &self.inner.texture);
+        written(py, |out| {
+            let png = png_bytes(&texture.atlas)?;
+            export::write_textured_glb(out, mesh, texture, &png)
+        })
+    }
+
+    /// One self-contained HTML page showing the textured mesh in 3D, titled `title`.
+    fn html<'py>(&self, py: Python<'py>, title: &str) -> PyResult<Bound<'py, PyBytes>> {
+        let (mesh, texture) = (&self.inner.mesh, &self.inner.texture);
+        written(py, |out| {
+            let png = png_bytes(&texture.atlas)?;
+            export::write_textured_html(out, mesh, texture, &png, title)
+        })
+    }
+
     /// The texture atlas as PNG.
     fn atlas_png<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
         let atlas = &self.inner.texture.atlas;
-        written(py, |out| {
-            let mut encoder = png::Encoder::new(out, atlas.width() as u32, atlas.height() as u32);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header()?;
-            writer.write_image_data(atlas.as_rgba())?;
-            writer.finish()?;
-            Ok(())
-        })
+        written(py, |out| write_png(out, atlas))
     }
 }

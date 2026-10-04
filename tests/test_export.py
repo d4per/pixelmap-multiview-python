@@ -1,5 +1,10 @@
 """Writing the model out for other tools, and reading photos in."""
 
+import base64
+import io
+import json
+import struct
+
 import numpy as np
 import pixelmap_multiview as pmv
 import pytest
@@ -33,6 +38,47 @@ def test_x3d_refers_to_its_texture(model, tmp_path):
     files = model.save(tmp_path / "scene.x3d")
     assert [f.name for f in files] == ["scene.x3d", "scene_texture.png"]
     assert "scene_texture.png" in files[0].read_text()
+
+
+def test_glb_is_one_file_with_the_atlas_embedded(model, tmp_path):
+    (path,) = model.save(tmp_path / "mesh.glb")
+    assert [f.name for f in tmp_path.iterdir()] == ["mesh.glb"]
+    data = path.read_bytes()
+    assert struct.unpack_from("<4sII", data) == (b"glTF", 2, len(data))
+
+    json_length, json_type = struct.unpack_from("<I4s", data, 12)
+    assert json_type == b"JSON"
+    gltf = json.loads(data[20 : 20 + json_length])
+    bin_start = 20 + json_length
+    bin_length, bin_type = struct.unpack_from("<I4s", data, bin_start)
+    assert bin_type == b"BIN\0"
+    binary = data[bin_start + 8 : bin_start + 8 + bin_length]
+    assert gltf["asset"]["version"] == "2.0"
+
+    (primitive,) = gltf["meshes"][0]["primitives"]
+    assert gltf["accessors"][primitive["indices"]]["count"] == 3 * len(model.triangles)
+
+    view = gltf["bufferViews"][gltf["images"][0]["bufferView"]]
+    png = binary[view["byteOffset"] : view["byteOffset"] + view["byteLength"]]
+    with Image.open(io.BytesIO(png)) as atlas:
+        assert np.array_equal(np.asarray(atlas.convert("RGBA")), model.texture.atlas)
+
+
+def test_html_embeds_the_glb_and_is_titled(model, tmp_path):
+    (glb,) = model.save(tmp_path / "statue.glb")
+    (page,) = model.save(tmp_path / "statue.html")
+    # The page holds an ellipsis and a middle dot, which some platforms' default
+    # encodings would misread.
+    text = page.read_text(encoding="utf-8")
+    assert "<title>statue</title>" in text
+    payload = text.split("data:model/gltf-binary;base64,")[1].split('"')[0]
+    assert base64.b64decode(payload) == glb.read_bytes()
+
+
+def test_html_title_is_escaped(model, tmp_path):
+    (page,) = model.save(tmp_path / "statue.html", title="Bob's <statue> & co")
+    text = page.read_text(encoding="utf-8")
+    assert "<title>Bob&apos;s &lt;statue&gt; &amp; co</title>" in text
 
 
 def test_an_unknown_suffix_is_refused(model, tmp_path):
