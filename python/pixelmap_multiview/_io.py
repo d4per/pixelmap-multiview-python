@@ -22,10 +22,12 @@ def load_photos(
     """Reads photos for :func:`reconstruct`, with the focal length EXIF records.
 
     Each photo is turned upright as its EXIF orientation says, converted to RGB, and
-    scaled down so that its longer side is at most ``max_size`` pixels. Scaling costs no
-    matching time — pixelmap works at a fixed resolution whatever it is given — but it
-    does cost precision in the geometry that follows, so ``max_size`` is a trade of
-    memory against detail. 1200 is what the crate's measurements were taken at.
+    scaled down so that its longer side is at most ``max_size`` pixels. Smaller photos
+    take less memory, but the geometry that follows is less precise, so ``max_size``
+    trades memory against detail. Matching time stays about the same at ``"low"`` and
+    ``"medium"``, because pixelmap scales photos down to a fixed working width. ``"high"``
+    works at up to 1600 px and never scales up, so below that, smaller photos make it
+    faster. 1200 is what the crate's measurements were taken at.
 
     Requires Pillow: ``pip install pixelmap-multiview-python[images]``.
 

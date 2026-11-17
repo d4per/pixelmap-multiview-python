@@ -4,6 +4,21 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.2 - 2026-11-17
+
+### Changed
+
+- Built against `pixelmap_multiview` 0.1.2 and pixelmap 0.3.1. Mapping each pair of
+  photos takes about 40% fewer region comparisons, so `reconstruct` is faster: on
+  4128x3096 photos one pair at `high` went from 5.9 s to 4.3 s.
+- **The same photos, quality and `seed` no longer give the model 0.1.1 gave.** Runs are
+  still deterministic, but the solver reaches a different, equally good correspondence.
+
+### Fixed
+
+- Gaps in the depth maps and the mesh. Some pairs' correspondence had straight unmapped
+  bands, one grid cell wide, running through it; pixelmap 0.3.1 no longer leaves them.
+
 ## 0.1.1 - 2026-10-04
 
 ### Added

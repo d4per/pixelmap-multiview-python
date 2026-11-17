@@ -105,8 +105,9 @@ STAGES: list[tuple[str, str]] = _pixelmap_multiview.STAGES
 class Quality(str, enum.Enum):
     """How much work pixelmap puts into each pair of photos.
 
-    The dominant cost of a run, since there are N(N-1)/2 pairs. One pair takes roughly
-    0.6 s at ``LOW``, 2.3 s at ``MEDIUM`` and 5.8 s at ``HIGH``.
+    Mapping the pairs takes most of a run's time, since there are N(N-1)/2 of them. One
+    pair of 1200 px photos takes roughly 0.2 s at ``LOW``, 1 s at ``MEDIUM`` and 2.9 s at
+    ``HIGH`` on a six-core laptop.
     """
 
     LOW = "low"

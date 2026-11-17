@@ -145,20 +145,31 @@ For a good capture:
 - Let neighbouring photos overlap generously.
 - Keep one camera at one zoom setting throughout.
 
-## Cost
+## Time complexity
 
-Mapping the pairs dominates: N photos take N(N−1)/2 pixelmap runs. One pair of 4:3 photos,
-native build:
+Mapping the pairs dominates: N photos take N(N−1)/2 pixelmap runs, one after another, so
+the time grows with the square of the number of photos. Four photos make 6 pairs; the 23
+photos of the statue make 253. One pair of 4:3 photos takes, by the long side of the
+photos:
 
 | Quality | 800 px | 1200 px | 1800 px |
 |---------|--------|---------|---------|
-| low     | 0.60 s | 0.56 s  | 0.50 s  |
-| medium  | 2.25 s | 2.30 s  | 2.38 s  |
-| high    |        | 5.81 s  |         |
+| low     | 0.22 s | 0.23 s  | 0.22 s  |
+| medium  | 0.98 s | 0.96 s  | 0.97 s  |
+| high    | 2.16 s | 2.90 s  | 4.08 s  |
 
-Input size barely changes the matching time, because pixelmap scales every photo to a
-fixed working width first. What a larger input buys is precision in the geometry that
-follows. Runs are deterministic: the same photos, quality and `seed` give the same model.
+So the statue at `medium` spends about four minutes mapping pairs. These are medians of
+three runs of `pixelmap-multiview --time-pair` from `pixelmap_multiview` 0.1.2, on a
+six-core Intel Core i7-9750H laptop. Expect other machines to be proportionally faster or
+slower.
+
+pixelmap scales both photos down to a fixed working width before matching them: 400 px
+for `low`, 800 px for `medium` and 1600 px for `high`. It never scales them up, so at
+`low` and `medium` the size of the input barely changes the time. `high` only works at its
+full width with photos at least 1600 px across, which is why it slows down as they grow;
+at the 1200 px `load_photos` gives by default it works at 1200 px. Larger photos also give
+more precise geometry after matching. Runs are deterministic: the same photos, quality and
+`seed` give the same model.
 
 ## Development
 

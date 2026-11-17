@@ -32,9 +32,9 @@ class Event:
     Attributes:
         stage: The stage it came from, one of the names in :data:`STAGES`.
         progress: How far through the whole run this is, ``0.0``-``1.0``, with each stage
-            weighted by its typical cost. ``None`` for events that say nothing about
-            progress — a log line or a dropped view — which a progress bar should ignore
-            rather than move backwards for.
+            weighted by how long it typically takes. ``None`` for events that say nothing
+            about progress — a log line or a dropped view — which a progress bar should
+            ignore rather than move backwards for.
         message: The event as one line for a log.
     """
 
