@@ -15,13 +15,17 @@ env:
 jobs:
   test:
     name: test (python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest: setup-python only has interpreters that were
+    # built for the runner image, and 3.9 reached end of life before Ubuntu 26.04 became
+    # ubuntu-latest, so it has no 3.9. 24.04 does. When 3.9 support is dropped, move this
+    # back to ubuntu-latest along with the new oldest version.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         # The wheels are abi3, so one build serves every version. Testing the oldest and
         # the newest is what checks that claim; the ones in between add nothing.
-        python-version: ["3.9", "3.13"]
+        python-version: ["3.9", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
