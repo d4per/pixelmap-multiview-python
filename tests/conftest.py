@@ -44,3 +44,11 @@ def model(recorded):
 @pytest.fixture(scope="session")
 def events(recorded):
     return recorded[1]
+
+
+@pytest.fixture(scope="session")
+def wide_disc_model(photos):
+    """The model of :func:`photos` with pixelmap's initial solve over a wider disc."""
+    import pixelmap_multiview as pmv
+
+    return pmv.reconstruct(photos, init_neighborhood_radius=9)

@@ -263,16 +263,16 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pixelmap"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68c5a7639712187ae7cc9671dcb9b02247971d965c8bef954b2e0b4fc580967c"
+checksum = "731ef344fc39355f6fea85b2b54a70c3898e3b31dc8bbf3cbaf06dbf5285a65e"
 dependencies = [
  "rayon",
 ]
 
 [[package]]
 name = "pixelmap-multiview-py"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "numpy",
  "pixelmap_multiview",
@@ -282,9 +282,9 @@ dependencies = [
 
 [[package]]
 name = "pixelmap_multiview"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32b6d01388114dc917063953f308c86e5652c5d27f2607125930c7205e5a7491"
+checksum = "9e515e5d8c5223b5c6e15bf6b48d4d0d39b2998a29b81dee01a90e1ddc3f3fcb"
 dependencies = [
  "nalgebra",
  "pixelmap",

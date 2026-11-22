@@ -4,6 +4,32 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0 - 2026-11-22
+
+### Added
+
+- `neighborhood_radius` and `init_neighborhood_radius` keywords for `reconstruct` and
+  `Job`: the radius of the disc pixelmap compares two photos over when it maps each pair,
+  in every solve or in the initial solve alone. Each is an int from 1 to the new
+  `MAX_NEIGHBORHOOD_RADIUS` (51), or `None`, the default, for pixelmap's own radius of 5.
+  A radius out of range raises `ValueError` when the call is made, not partway through
+  the run.
+- `Quality.ULTRA` (`"ultra"`): `HIGH`, then two more steps at the photos' own width, up
+  to 3200 px. On photos no wider than 1600 px it is the same as `HIGH`.
+
+### Changed
+
+- Built against `pixelmap_multiview` 0.2.0 and pixelmap 0.4.1.
+- **`medium` and `high` no longer scale photos up.** They used to scale photos narrower
+  than their working width (800 and 1600 px) up to it. They now work at the photos' own
+  width instead, which pixelmap found more accurate and is faster, but it gives a sparser
+  mesh. With `load_photos`' default of 1200 px, portrait photos are 900 px wide: on three
+  such photos `high` gave 81,526 vertices where 0.1.2 gave 322,885. Pass `load_photos` a
+  larger `max_size`, or `None`, for the density back. Photos at least as wide as the
+  working width give the same model as 0.1.2, bit for bit, and `low` always does.
+- The README's timings are re-measured against 0.2.0 and have an `ultra` row and a
+  2400×3200 column.
+
 ## 0.1.2 - 2026-11-17
 
 ### Changed

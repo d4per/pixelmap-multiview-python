@@ -1,5 +1,6 @@
 """A run on a background thread: followed, polled and stopped."""
 
+import numpy as np
 import pixelmap_multiview as pmv
 import pytest
 
@@ -26,6 +27,11 @@ def test_a_job_can_be_followed_to_the_end(photos, model):
     finished = job.join()
     # The same photos and seed as the blocking run give the same model.
     assert len(finished.vertices) == len(model.vertices)
+
+
+def test_a_job_passes_the_neighborhood_radius_on(photos, wide_disc_model):
+    finished = pmv.Job(photos, init_neighborhood_radius=9).join()
+    assert np.array_equal(finished.vertices, wide_disc_model.vertices)
 
 
 def test_polling_without_waiting_returns_at_once(small_photos):

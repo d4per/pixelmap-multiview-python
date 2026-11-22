@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 MIN_VIEWS: int
 MIN_DIMENSION: int
+MAX_NEIGHBORHOOD_RADIUS: int
 MIN_PAIR_COVERAGE: float
 DEFAULT_MAX_TEXTURE_SIZE: int
 STAGES: list[tuple[str, str]]
@@ -72,6 +73,8 @@ def run(
     seed: int | None,
     refine_focal: bool,
     max_texture_size: int,
+    neighborhood_radius: int | None,
+    init_neighborhood_radius: int | None,
     on_event: Callable[[str, dict[str, Any]], None] | None,
 ) -> Model: ...
 def start(
@@ -82,6 +85,8 @@ def start(
     seed: int | None,
     refine_focal: bool,
     max_texture_size: int,
+    neighborhood_radius: int | None,
+    init_neighborhood_radius: int | None,
 ) -> Job: ...
 def _synthetic_orbit(
     scene: str, views: int, spread_deg: float, width: int, height: int

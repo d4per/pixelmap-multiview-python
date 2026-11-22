@@ -149,27 +149,51 @@ For a good capture:
 
 Mapping the pairs dominates: N photos take N(N−1)/2 pixelmap runs, one after another, so
 the time grows with the square of the number of photos. Four photos make 6 pairs; the 23
-photos of the statue make 253. One pair of 4:3 photos takes, by the long side of the
-photos:
+photos of the statue make 253. One pair of portrait 4:3 photos takes, by the size of the
+photos (width × height):
 
-| Quality | 800 px | 1200 px | 1800 px |
-|---------|--------|---------|---------|
-| low     | 0.22 s | 0.23 s  | 0.22 s  |
-| medium  | 0.98 s | 0.96 s  | 0.97 s  |
-| high    | 2.16 s | 2.90 s  | 4.08 s  |
+| Quality | 600×800 | 900×1200 | 1350×1800 | 2400×3200 |
+|---------|---------|----------|-----------|-----------|
+| low     | 0.25 s  | 0.24 s   | 0.23 s    | 0.24 s    |
+| medium  | 0.73 s  | 1.10 s   | 1.04 s    | 1.02 s    |
+| high    | 0.92 s  | 1.68 s   | 3.02 s    | 3.93 s    |
+| ultra   | 0.93 s  | 1.67 s   | 2.93 s    | 6.18 s    |
 
-So the statue at `medium` spends about four minutes mapping pairs. These are medians of
-three runs of `pixelmap-multiview --time-pair` from `pixelmap_multiview` 0.1.2, on a
-six-core Intel Core i7-9750H laptop. Expect other machines to be proportionally faster or
-slower.
+So the statue at `medium`, loaded at the default 1200 px, spends about four and a half
+minutes mapping pairs. These are medians over nine pairs (three runs over three of the
+statue photos), timed through `on_event` with `pixelmap_multiview` 0.2.0, on a six-core
+Intel Core i7-9750H laptop. Expect other machines to be proportionally faster or slower.
 
-pixelmap scales both photos down to a fixed working width before matching them: 400 px
-for `low`, 800 px for `medium` and 1600 px for `high`. It never scales them up, so at
-`low` and `medium` the size of the input barely changes the time. `high` only works at its
-full width with photos at least 1600 px across, which is why it slows down as they grow;
-at the 1200 px `load_photos` gives by default it works at 1200 px. Larger photos also give
-more precise geometry after matching. Runs are deterministic: the same photos, quality and
-`seed` give the same model.
+pixelmap scales both photos down to a working width before matching them: 400 px for
+`low`, 800 px for `medium`, 1600 px for `high` and 3200 px for `ultra`. It never scales
+them up, so a preset works at the photos' own width when they are narrower than that.
+That is why `low` and `medium` take about the same time whatever the size, and why `high`
+and `ultra` slow down as the photos grow. `ultra` is the same as `high` until the photos
+are wider than 1600 px. A wider working width also gives a denser mesh with more precise
+geometry: on 900 px-wide photos `high` gives about a quarter of the points that 0.1.2 did
+by scaling them up to 1600 px. Pass `load_photos` a larger `max_size` for a denser
+model. Runs are deterministic: the same photos, quality and `seed` give the same model.
+
+## Tuning the correspondence
+
+Two keywords pass pixelmap's neighborhood radius straight through, for a caller tuning how
+each pair is mapped. They mean what they mean in pixelmap, and left at `None` pixelmap's
+default of 5 applies:
+
+```python
+model = pmv.reconstruct(photos, quality="high", init_neighborhood_radius=9)
+```
+
+- `neighborhood_radius` is the radius, in working pixels, of the disc pixelmap compares
+  the two photos over, in every step. A larger disc matches weakly textured or strongly
+  warped regions more reliably, but blurs the mapping across depth edges, and the time per
+  pair grows with its area: 9 roughly doubles it.
+- `init_neighborhood_radius` is the same for the initial solve alone, the one that grows
+  each pair's mapping out from its feature matches. On pixelmap's benchmarks 9 here was
+  the cheap gain, for 20–30% more time per pair.
+
+Both take an int from 1 to `pmv.MAX_NEIGHBORHOOD_RADIUS` (51). Every mapped cell becomes a
+3D point, so judge a change by the model it gives rather than by pixelmap's benchmarks.
 
 ## Development
 

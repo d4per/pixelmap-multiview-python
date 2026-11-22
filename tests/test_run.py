@@ -79,6 +79,16 @@ def test_the_same_seed_gives_the_same_model(photos, model):
     assert np.array_equal(again.triangles, model.triangles)
 
 
+def test_a_neighborhood_radius_reaches_pixelmap(model, wide_disc_model):
+    # The default is pixelmap's own radius, so a different one must change the mapping,
+    # and through it the mesh, while still giving a model of every photo.
+    assert wide_disc_model.connected == model.connected
+    assert not (
+        wide_disc_model.vertices.shape == model.vertices.shape
+        and np.array_equal(wide_disc_model.vertices, model.vertices)
+    )
+
+
 def test_a_given_focal_length_is_used(photos):
     model = pmv.reconstruct(photos, focal_px=640.0, max_texture_size=512)
     assert model.intrinsics.source == "provided"

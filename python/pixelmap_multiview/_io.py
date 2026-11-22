@@ -24,10 +24,12 @@ def load_photos(
     Each photo is turned upright as its EXIF orientation says, converted to RGB, and
     scaled down so that its longer side is at most ``max_size`` pixels. Smaller photos
     take less memory, but the geometry that follows is less precise, so ``max_size``
-    trades memory against detail. Matching time stays about the same at ``"low"`` and
-    ``"medium"``, because pixelmap scales photos down to a fixed working width. ``"high"``
-    works at up to 1600 px and never scales up, so below that, smaller photos make it
-    faster. 1200 is what the crate's measurements were taken at.
+    trades memory against detail. pixelmap scales photos down to a working width (400 px
+    at ``"low"``, 800 at ``"medium"``, 1600 at ``"high"``, 3200 at ``"ultra"``) and never
+    up, so photos narrower than that are matched at their own width: faster, but with a
+    sparser mesh. Matching time therefore stays about the same at ``"low"`` and
+    ``"medium"``, while ``"high"`` and ``"ultra"`` get slower and denser as the photos
+    grow. Pass a larger ``max_size``, or ``None``, to give them the width to work at.
 
     Requires Pillow: ``pip install pixelmap-multiview-python[images]``.
 

@@ -14,7 +14,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use numpy::PyReadonlyArray3;
-use pixelmap_multiview::pixelmap::{Photo, Quality};
+use pixelmap_multiview::pixelmap::{Photo, Quality, MAX_NEIGHBORHOOD_RADIUS};
 use pixelmap_multiview::synthetic::{Scene, SyntheticSet};
 use pixelmap_multiview::{Flow, Focal, Options, Stage, ViewId};
 use pyo3::exceptions::PyValueError;
@@ -33,6 +33,7 @@ fn photos(arrays: Vec<PyReadonlyArray3<'_, u8>>) -> PyResult<Vec<Arc<Photo>>> {
 /// The crate's `Options`, from arguments the Python layer has already checked.
 ///
 /// `focal_kind` is `"unknown"`, `"35mm"` or `"pixels"`, with `focal_value` in those units.
+#[allow(clippy::too_many_arguments)]
 fn options(
     quality: &str,
     focal_kind: &str,
@@ -40,6 +41,8 @@ fn options(
     seed: Option<u64>,
     refine_focal: bool,
     max_texture_size: usize,
+    neighborhood_radius: Option<usize>,
+    init_neighborhood_radius: Option<usize>,
 ) -> PyResult<Options> {
     let quality =
         Quality::from_str(quality).map_err(|err| PyValueError::new_err(err.to_string()))?;
@@ -53,12 +56,26 @@ fn options(
             )))
         }
     };
+    // The crate panics on a radius pixelmap cannot score. The Python layer has already
+    // refused one, so this only keeps a panic from reaching Python if that changes.
+    for radius in [neighborhood_radius, init_neighborhood_radius]
+        .into_iter()
+        .flatten()
+    {
+        if !(1..=MAX_NEIGHBORHOOD_RADIUS).contains(&radius) {
+            return Err(PyValueError::new_err(format!(
+                "neighborhood radius must be in 1..={MAX_NEIGHBORHOOD_RADIUS}, not {radius}"
+            )));
+        }
+    }
     Ok(Options::new()
         .quality(quality)
         .focal(focal)
         .seed(seed)
         .refine_focal(refine_focal)
-        .max_texture_size(max_texture_size))
+        .max_texture_size(max_texture_size)
+        .neighborhood_radius(neighborhood_radius)
+        .init_neighborhood_radius(init_neighborhood_radius))
 }
 
 /// Reconstructs a model from photos, blocking until it is done.
@@ -68,7 +85,7 @@ fn options(
 /// stopped. Signals are checked at every event, not only when there is a callback, so
 /// Ctrl-C works without one.
 #[pyfunction]
-#[pyo3(signature = (photos, quality, focal_kind, focal_value, seed, refine_focal, max_texture_size, on_event))]
+#[pyo3(signature = (photos, quality, focal_kind, focal_value, seed, refine_focal, max_texture_size, neighborhood_radius, init_neighborhood_radius, on_event))]
 #[allow(clippy::too_many_arguments)]
 fn run(
     py: Python<'_>,
@@ -79,6 +96,8 @@ fn run(
     seed: Option<u64>,
     refine_focal: bool,
     max_texture_size: usize,
+    neighborhood_radius: Option<usize>,
+    init_neighborhood_radius: Option<usize>,
     on_event: Option<Py<PyAny>>,
 ) -> PyResult<model::Model> {
     let options = options(
@@ -88,6 +107,8 @@ fn run(
         seed,
         refine_focal,
         max_texture_size,
+        neighborhood_radius,
+        init_neighborhood_radius,
     )?;
     let photos = self::photos(photos)?;
 
@@ -127,7 +148,8 @@ fn run(
 /// Nothing is validated here, as in the crate: anything wrong with the photos comes back
 /// from `join` as the same exception `run` would have raised.
 #[pyfunction]
-#[pyo3(signature = (photos, quality, focal_kind, focal_value, seed, refine_focal, max_texture_size))]
+#[pyo3(signature = (photos, quality, focal_kind, focal_value, seed, refine_focal, max_texture_size, neighborhood_radius, init_neighborhood_radius))]
+#[allow(clippy::too_many_arguments)]
 fn start(
     photos: Vec<PyReadonlyArray3<'_, u8>>,
     quality: &str,
@@ -136,6 +158,8 @@ fn start(
     seed: Option<u64>,
     refine_focal: bool,
     max_texture_size: usize,
+    neighborhood_radius: Option<usize>,
+    init_neighborhood_radius: Option<usize>,
 ) -> PyResult<job::Job> {
     let options = options(
         quality,
@@ -144,6 +168,8 @@ fn start(
         seed,
         refine_focal,
         max_texture_size,
+        neighborhood_radius,
+        init_neighborhood_radius,
     )?;
     Ok(job::Job::new(pixelmap_multiview::Job::start(
         self::photos(photos)?,
@@ -189,6 +215,7 @@ fn _pixelmap_multiview(m: &Bound<'_, PyModule>) -> PyResult<()> {
         pixelmap_multiview::DEFAULT_MAX_TEXTURE_SIZE,
     )?;
     m.add("MIN_DIMENSION", pixelmap_multiview::pixelmap::MIN_DIMENSION)?;
+    m.add("MAX_NEIGHBORHOOD_RADIUS", MAX_NEIGHBORHOOD_RADIUS)?;
     m.add(
         "STAGES",
         Stage::ALL

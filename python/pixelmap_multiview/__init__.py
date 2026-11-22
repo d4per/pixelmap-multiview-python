@@ -73,6 +73,7 @@ __all__ = [
     "MIN_VIEWS",
     "MIN_DIMENSION",
     "MIN_PAIR_COVERAGE",
+    "MAX_NEIGHBORHOOD_RADIUS",
     "DEFAULT_MAX_TEXTURE_SIZE",
     "STAGES",
     "__version__",
@@ -94,6 +95,9 @@ MIN_DIMENSION: int = _pixelmap_multiview.MIN_DIMENSION
 #: The fraction of a photo a pair's mapping must cover to count as linking the two.
 MIN_PAIR_COVERAGE: float = _pixelmap_multiview.MIN_PAIR_COVERAGE
 
+#: The largest ``neighborhood_radius`` or ``init_neighborhood_radius`` pixelmap accepts.
+MAX_NEIGHBORHOOD_RADIUS: int = _pixelmap_multiview.MAX_NEIGHBORHOOD_RADIUS
+
 #: The largest texture atlas a reconstruction produces by default, in pixels on a side.
 DEFAULT_MAX_TEXTURE_SIZE: int = _pixelmap_multiview.DEFAULT_MAX_TEXTURE_SIZE
 
@@ -106,8 +110,10 @@ class Quality(str, enum.Enum):
     """How much work pixelmap puts into each pair of photos.
 
     Mapping the pairs takes most of a run's time, since there are N(N-1)/2 of them. One
-    pair of 1200 px photos takes roughly 0.2 s at ``LOW``, 1 s at ``MEDIUM`` and 2.9 s at
-    ``HIGH`` on a six-core laptop.
+    pair of 1350x1800 photos takes roughly 0.2 s at ``LOW``, 1 s at ``MEDIUM``, 3 s at
+    ``HIGH`` and the same at ``ULTRA``. At 2400x3200, ``HIGH`` takes 3.9 s and ``ULTRA``
+    6.2 s, on a six-core laptop. No preset scales photos up, so ``MEDIUM`` and above
+    work at the photos' own width when it is narrower than theirs.
     """
 
     LOW = "low"
@@ -117,7 +123,13 @@ class Quality(str, enum.Enum):
     """Slower, and more accurate."""
 
     HIGH = "high"
-    """Slowest, and likely the best result."""
+    """Slower again, and likely the best result on photos up to 1600 px wide."""
+
+    ULTRA = "ultra"
+    """``HIGH``, then two more steps at the photos' own width, up to 3200 px. On photos
+    no wider than 1600 px it is the same as ``HIGH``; on larger ones with the detail to
+    show for it, it maps more of each pair and more precisely, for more time and memory.
+    """
 
     def __str__(self) -> str:
         return self.value
@@ -133,7 +145,7 @@ def _quality_name(quality: QualityArg) -> str:
         return quality
     raise TypeError(
         f"quality must be a pixelmap_multiview.Quality or one of 'low', 'medium', "
-        f"'high', got {type(quality).__name__}"
+        f"'high', 'ultra', got {type(quality).__name__}"
     )
 
 
@@ -178,6 +190,8 @@ def _arguments(
     seed: Optional[int],
     refine_focal: bool,
     max_texture_size: int,
+    neighborhood_radius: Optional[int],
+    init_neighborhood_radius: Optional[int],
 ) -> tuple:
     """Checks and normalises the arguments :func:`reconstruct` and :class:`Job` share,
     in the order the native functions take them."""
@@ -200,6 +214,19 @@ def _arguments(
         raise ValueError(f"seed must fit in an unsigned 64-bit integer, got {seed}")
     if max_texture_size < 1:
         raise ValueError(f"max_texture_size must be positive, got {max_texture_size}")
+    radii = {
+        "neighborhood_radius": neighborhood_radius,
+        "init_neighborhood_radius": init_neighborhood_radius,
+    }
+    for name, radius in radii.items():
+        if radius is None:
+            continue
+        if isinstance(radius, bool) or not isinstance(radius, (int, np.integer)):
+            raise TypeError(f"{name} must be an int or None, got {type(radius).__name__}")
+        if not (1 <= radius <= MAX_NEIGHBORHOOD_RADIUS):
+            raise ValueError(
+                f"{name} must be between 1 and {MAX_NEIGHBORHOOD_RADIUS}, got {radius}"
+            )
 
     return (
         photos,
@@ -209,6 +236,8 @@ def _arguments(
         seed,
         bool(refine_focal),
         int(max_texture_size),
+        None if neighborhood_radius is None else int(neighborhood_radius),
+        None if init_neighborhood_radius is None else int(init_neighborhood_radius),
     )
 
 
@@ -221,6 +250,8 @@ def reconstruct(
     seed: Optional[int] = None,
     refine_focal: bool = False,
     max_texture_size: int = DEFAULT_MAX_TEXTURE_SIZE,
+    neighborhood_radius: Optional[int] = None,
+    init_neighborhood_radius: Optional[int] = None,
     on_event: Optional[Callable[[Event], None]] = None,
 ) -> Model:
     """Reconstructs a textured mesh from photos of one scene.
@@ -234,7 +265,8 @@ def reconstruct(
             ``(H, W)``, ``(H, W, 3)`` or ``(H, W, 4)``. Pillow images work directly;
             :func:`load_photos` reads files. Step sideways between shots rather than
             turning on the spot, and let neighbouring photos overlap generously.
-        quality: :class:`Quality` preset, or ``"low"``, ``"medium"`` or ``"high"``.
+        quality: :class:`Quality` preset, or ``"low"``, ``"medium"``, ``"high"`` or
+            ``"ultra"``.
         focal_35mm: The 35 mm-equivalent focal length, as EXIF records it.
         focal_px: The focal length in pixels of the photos as handed in, for a calibrated
             camera. Give at most one of the two. With neither, the focal length is
@@ -244,6 +276,17 @@ def reconstruct(
         refine_focal: Refine a given focal length during bundle adjustment. Always done
             when none is given.
         max_texture_size: The largest texture atlas to produce, in pixels on a side.
+        neighborhood_radius: The radius, in pixelmap's working pixels, of the disc it
+            compares two photos over when mapping each pair, from 1 to
+            :data:`MAX_NEIGHBORHOOD_RADIUS`. ``None`` keeps pixelmap's default, 5. A
+            larger disc matches weakly textured or strongly warped regions more
+            reliably, but blurs the mapping across depth edges, and the time per pair
+            grows with its area: 9 roughly doubles it. Every mapped cell becomes a 3D
+            point, so judge a change by the model rather than by pixelmap's benchmarks.
+        init_neighborhood_radius: The same, for pixelmap's initial solve alone: the one
+            that grows each pair's mapping out from its feature matches. ``None`` falls
+            back to ``neighborhood_radius``. On pixelmap's benchmarks 9 here was the cheap
+            gain, for 20-30% more time per pair.
         on_event: Called with an :class:`Event` at every checkpoint. An exception it
             raises stops the run and is re-raised here. Ctrl-C stops the run the same way,
             with or without a callback.
@@ -258,6 +301,7 @@ def reconstruct(
             message says why, and what to change.
         ValueError: A photo is not a uint8 array of an accepted shape, or a setting is
             out of range.
+        TypeError: ``quality`` or a radius is of the wrong type.
     """
     callback = None
     if on_event is not None:
@@ -266,7 +310,15 @@ def reconstruct(
             on_event(_event(kind, fields))
 
     arguments = _arguments(
-        photos, quality, focal_35mm, focal_px, seed, refine_focal, max_texture_size
+        photos,
+        quality,
+        focal_35mm,
+        focal_px,
+        seed,
+        refine_focal,
+        max_texture_size,
+        neighborhood_radius,
+        init_neighborhood_radius,
     )
     return Model(_pixelmap_multiview.run(*arguments, callback))
 
@@ -300,9 +352,19 @@ class Job:
         seed: Optional[int] = None,
         refine_focal: bool = False,
         max_texture_size: int = DEFAULT_MAX_TEXTURE_SIZE,
+        neighborhood_radius: Optional[int] = None,
+        init_neighborhood_radius: Optional[int] = None,
     ) -> None:
         arguments = _arguments(
-            photos, quality, focal_35mm, focal_px, seed, refine_focal, max_texture_size
+            photos,
+            quality,
+            focal_35mm,
+            focal_px,
+            seed,
+            refine_focal,
+            max_texture_size,
+            neighborhood_radius,
+            init_neighborhood_radius,
         )
         self._inner = _pixelmap_multiview.start(*arguments)
 
